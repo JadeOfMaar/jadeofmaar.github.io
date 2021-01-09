@@ -1,0 +1,416 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name=viewport content="width=device-width, initial-scale=1">
+<title>Resonant Orbit Calculator (Kerbal Space Program)</title>
+<style type="text/css">
+body {font: 1em Lucida Grande, Helvetica, Arial, sans-serif;}
+body > * {box-sizing: border-box;}
+#debug {background-color: rgba(255,255,0,0.2);}
+
+#text {margin: 0 15% 3em;}
+#text h1 {font-size: 1.75em;}
+
+section {display: flex; justify-content: center;}
+form h3 {font-size: 1em; border-left: 11em solid silver;
+	padding: 0.25em 0.5em 0; margin: 0 0 0.75em;}
+form {font-size: 0.85em;}
+form ul {margin: 0 0 2em; padding: 0;}
+form ul li {display: flex; align-items: baseline; margin: 0.2em 0; justify-content: flex-start;}
+form ul li > label {width: 11em; padding-right: 0.5em; text-align: right; color: rgba(0,0,0,0.67);}
+form ul li input {margin-right: 0.25em; border-width: 0 0 1px; border-color: #999; border-style: solid; font-size: inherit;}
+form ul li input[size="1"] {width: 3em;}
+form ul li input[size="12"] {width: 10em;}
+form ul li input[disabled] {color: inherit; background: inherit; border-width: 0 0 0;}
+form optgroup {font-size: 0.9em; margin: 0;}
+form option:not(.moon) {margin: 0.25em 0 0; font-weight: bold;}
+form option.moon {padding-left: 2em; margin: 0;}
+#parameters .warning {color: rgb(216,0,0);}
+#chart .warning {stroke: rgb(216,0,0);}
+
+#parameters {flex-shrink: 0;}
+#schematic {margin: 0 2em;}
+#chart {border: 1px solid rgba(0,0,0,0.1); height: 500px; width: 500px; background: #EEE;}
+#chart {display: block; margin: 0 auto;}
+
+footer {display: flex; justify-content: space-between;
+	padding: 0.5em; border-top: 1px solid silver; margin-top: 5em;
+	font-size: smaller; color: rgba(0,0,0,0.5);}
+footer span:first-child {white-space: nowrap; margin-right: 2em;}
+footer span:last-child {text-align: right;}
+
+@supports (display: grid) {
+	body {display: grid;
+		grid-template-columns: min-content;
+		justify-content: center;}
+	#text {margin: 0 0 2em;}
+}
+
+@media (max-width: 850px) {
+	body {display: block;}
+	#schematic {width: 50vw;}
+	#chart {width: 100%; height: auto;}
+}
+@media (max-width: 650px) {
+	body {display: flex; flex-direction: column; align-items: center;}
+	#text {order: 10; padding: 1em; margin: 0;}
+	#text h1 {font-size: 1.5em;}
+	section {display: block;}
+	form ul li input {border-width: 1px; border-color: black; background: #FFE;}
+	#schematic {width: 100vw; margin: 0;}
+	#chart {border-width: 1px 0;}
+	footer {order: 20; margin-top: 1em;}
+}
+</style>
+</head>
+<body>
+
+<div id="text">
+<h1>Resonant Orbit Calculator</h1>
+<p>
+Calculates—and draws, because pictures are pretty—the resonant orbit needed for a carrier craft to inject craft it carries, like satellites, into equidistant positions of a shared circular orbit.  This is useful for setting up things like CommNet constellations around various celestial bodies.  The “injection burn” value provides the delta-v required to move from the resonant orbit to the final (circular) orbit.
+</p>
+<p>
+If you’re using <acronym title="Real Solar System">RSS</acronym>, <a href="http://forum.kerbalspaceprogram.com/index.php?/profile/148945-pap1723/">pap1723</a> created <a href="https://pap1723.github.io/RSSResonantOrbits/">a version of this just for you</a>!
+</p>
+</div>
+
+<section>
+
+<form id="parameters">
+<h3>Parameters</h3>
+<ul id="inputs">
+<li><label for="bodylist">Celestial body</label> <span>
+<select id="bodylist" autofocus>
+<option>Kerbol</option>
+<option>Moho</option>
+<option>Eve</option>
+<option>Gilly</option>
+<option selected>Kerbin</option>
+<option class="moon">Mun</option>
+<option class="moon">Minmus</option>
+<option>Duna</option>
+<option class="moon">Ike</option>
+<option>Dres</option>
+<option>Jool</option>
+<option class="moon">Laythe</option><option class="moon">Vall</option><option class="moon">Tylo</option><option class="moon">Bop</option><option class="moon">Pol</option>
+<option>Eeloo</option>
+</select>
+</span></li>
+<li><label for="satellites">Number of satellites</label> <span><input type="number" id="satellites" size="1"></span></li>
+<li><label for="altitude">Orbital altitude</label> <span><input type="number" id="altitude" size="12">m</span></li>
+<li><label>Orbital period</label> <span><input type="text" id="period" size="12" disabled></span></li>
+</ul>
+<h3>Resonant orbit</h3>
+<ul id="outputs">
+<li><label>Apoapsis</label> <span><input type="text" id="carrierAp" size="12" disabled></span></span></li>
+<li><label>Periapsis</label> <span><input type="text" id="carrierPe" size="12" disabled></span></span></li>
+<li><label>Orbital Period</label> <span><input type="text" id="carrierT" size="12" disabled></span></span></li>
+<li><label for="fliporbit">Dive orbit</label> <span><input type="checkbox" id="fliporbit"></span></li>
+</ul>
+<h3>Injection Burn</h3>
+<ul>
+<li><label>Δv</label> <span><input type="text" id="burnDV" size="10" disabled></span></span></li>
+</ul>
+<div id="debug"></div>
+
+</form>
+
+<div id="schematic">
+<svg viewBox="0 0 1000 1000" xmlns="http://www.w3.org/2000/svg" id="chart">
+
+
+<circle cx="50%" cy="50%" r="0" fill="#FFF" stroke="#CCC" stroke-dasharray="15,15" stroke-width="2" id="bodySOI" />
+<path d="" fill="none" stroke-width="0" stroke="red" id="bodySOIlabel" />
+<text text-anchor="middle" font-size="21" fill="#888">
+<textpath xlink:href="#oneradiuslabel" startOffset="50%">Minimum LOS altitude <tspan id="msa"></tspan>m</textpath>
+</text>
+<text text-anchor="middle" font-size="24" fill="#888">
+<textpath xlink:href="#geosynclabel" startOffset="50%">Synchronous orbit <tspan id="syncm"></tspan>m</textpath>
+</text>
+<text text-anchor="middle" font-size="24" fill="#888">
+<textpath xlink:href="#bodySOIlabel" startOffset="50%">Sphere of Influence <tspan id="SOId"></tspan>m</textpath>
+</text>
+
+<circle cx="50%" cy="50%" r="0" fill="#EEE" id="atmosphere" />
+
+<circle cx="50%" cy="50%" r="0" fill="none" stroke="#999" stroke-width="2" stroke-dasharray="10,10" id="oneradius" />
+<path d="" fill="none" stroke-width="0" stroke="red" id="oneradiuslabel" />
+
+<circle cx="50%" cy="50%" r="0" fill="none" stroke="#999" stroke-width="2" stroke-dasharray="10,10" id="geosync" />
+<path d="" fill="none" stroke-width="0" stroke="red" id="geosynclabel" />
+
+
+<ellipse cx="50%" cy="50%" rx="0" ry="0" fill="none" stroke="goldenrod" stroke-width="1.5" id="satelliteorbit" />
+<ellipse cx="0" cy="0" rx="0" ry="0" fill="none" stroke="green" stroke-width="2" id="carrierorbit" />
+<circle cx="50%" cy="0" r="10" fill="tan" id="launchpoint" />
+
+<circle cx="50%" cy="50%" r="0" fill="#666" id="body" />
+</svg>
+</div>
+
+</section>
+
+<footer>
+<span>A <a href="http://meyerweb.com/">meyerweb</a> joint.</span>
+<span>I dunno about the license, probably just give me (Eric Meyer) credit if you copy or recreate it elsewhere.  I’ll put something permissive on here eventually. Originally released 4 February 2017.</span>
+</footer>
+</body>
+
+<script type="text/javascript">
+
+var bodies = {
+// body("name", "fill color", GM value, SoI distance (m), stationary orbit distance (m), equatorial radius (m), atmospheric height (m) )
+	Kerbol: new body("Kerbol","#FE9",1172332800000000000,1000000000000,1508045290,261600000,0),
+	Moho: new body("Moho","#80736B",168609380000,9646663,0,250000,0),
+	Eve: new body("Eve","#897695",8171730200000,85109365,11028472,700000,90000),
+	Gilly: new body("Gilly","#867D78",8289449.8,126123.27,55138,13000,0),
+	Kerbin: new body("Kerbin","#495B66",3531600000000,84159286,3468751,600000,70000),
+	Mun: new body("Mun","",65138398000,2429559.1,0,200000,0),
+	Minmus: new body("Minmus","#9BB4A5",1765800000,2247428.4,417941,60000,0),
+	Duna: new body("Duna","#905646",3013632100000,47921949,3200000,320000,50000),
+	Ike: new body("Ike","",185683690000,1049598.9,0,130000,0),
+	Dres: new body("Dres","#878482",21484489000,32832840,870244,138000,0),
+	Jool: new body("Jool","#708D4B",282528000000000,2455985200,21010461,6000000,200000),
+	Laythe: new body("Laythe","#5C6068",1962000000000,3723645.8,0,500000,50000),
+	Vall: new body("Vall","#879192",2074815000000,2406401.4,0,300000,0),
+	Tylo: new body("Tylo","#9B9894",2825280000000,10856518,0,600000,0),
+	Bop: new body("Bop","#655D57",2486834900,1221060.9,0,65000,0),
+	Pol: new body("Pol","#938C7E",721702080,1042138.9,0,44000,0),
+	Eeloo: new body("Eeloo","#959B9B",74410815000,119082940,893691,210000,0)
+};
+
+function body(name,color,gm,soi,geo,eqr,atm) {
+	this.name = name;
+	this.color = color;
+	this.GM = gm;
+	this.eqr = eqr;
+	this.SOI = soi;
+	this.geo = geo;
+	this.atm = atm;
+}
+
+function orbit(Ap,Pe,body) {
+	this.Ap = Ap;
+	this.Pe = Pe;
+	this.body = body;
+}
+
+Object.defineProperties(orbit.prototype, {
+	"GM":  { get: function() { return this.body.GM; }},
+	"eqr": { get: function() { return this.body.eqr; }},
+	"MA":  { get: function() { return this.Ap + this.Pe + 2*this.eqr; }},
+	"SMA": { get: function() { return this.MA/2; }},
+	"ma":  { get: function() { return this.MA * Math.sqrt(1 - (Math.pow(this.e,2))); }},
+	"sma": { get: function() { return this.ma/2; }},
+	"ApR": { get: function() { return this.Ap + this.eqr; }},
+	"PeR": { get: function() { return this.Pe + this.eqr; }},
+	"PeV": { get: function() { return Math.sqrt((2 * this.ApR * this.GM) / (this.MA * this.PeR)); }},
+	"ApV": { get: function() { return Math.sqrt((2 * this.PeR * this.GM) / (this.MA * this.ApR)); }},
+	"e":   { get: function() { return ((this.PeR * Math.pow(this.PeV,2)) / this.GM) - 1; }},
+	"F":   { get: function() { return Math.sqrt(Math.pow(this.SMA,2) - Math.pow(this.sma,2)); }},
+	"T":   { get: function() { return 2 * Math.PI * Math.sqrt(Math.pow(this.SMA,3) / this.GM); }},
+	"op":  { get: function() { return this.T/3600; }},
+	"oph": { get: function() {
+		var hours = Math.floor(this.op);
+		var min = Math.floor((this.op - hours) * 60);
+		var sec = Math.round(10 * (this.op - hours - min/60) * 3600) / 10;
+		var time = hours + "h:" + min + "m:" + sec +"s";
+		return time;
+	}},
+	
+	"newMAfromT": {get: function(newT) { return 2 * Math.cbrt( (this.GM * Math.pow(newT,2)) / 39.4784176 ); }},
+	 // 39.4784176 = 4π^2
+
+	"setAp":    { set: function(alt)   { this.Ap = alt; }},
+	"setPe":    { set: function(alt)   { this.Pe = alt; }},
+	"modifyAp": { set: function(newMA) { this.setAp = this.Ap + (newMA - this.MA); }},
+	"modifyPe": { set: function(newMA) { this.setPe = this.Pe - (this.MA - newMA); }},
+});
+
+function newMAfromT(T,body) {
+	return 2 * Math.cbrt( (body.GM * Math.pow(T,2)) / 39.4784176 );  // 39.4784176 = 4π^2
+}
+
+function setup() {
+	inputs.bodylist.addEventListener("change",update,false);
+	inputs.altitude.addEventListener("change",update,false);
+	inputs.satellites.addEventListener("change",update,false);
+	inputs.fliporbit.addEventListener("change",update,false);
+}
+
+var inputs = {
+	"bodylist": document.getElementById("bodylist"),
+	"altitude": document.getElementById("altitude"),
+	"satellites": document.getElementById("satellites"),
+	"fliporbit": document.getElementById("fliporbit"),
+};
+
+var outputs = {
+	"period": document.getElementById("period"),
+	"carrierAp": document.getElementById("carrierAp"),
+	"carrierPe": document.getElementById("carrierPe"),
+	"carrierT": document.getElementById("carrierT"),
+	"burnDV": document.getElementById("burnDV"),
+	"sorbit": document.getElementById("satelliteorbit"),
+	"corbit": document.getElementById("carrierorbit"),
+	"chart": document.getElementById("chart"),
+};
+
+var chart = {
+	"body": document.getElementById("body"),
+	"bodySOI": document.getElementById("bodySOI"),
+	"bodySOIlabel": document.getElementById("bodySOIlabel"),
+	"SOId": document.getElementById("SOId"),
+	"geosync": document.getElementById("geosync"),
+	"geosynclabel": document.getElementById("geosynclabel"),
+	"syncm": document.getElementById("syncm"),
+	"oneradius": document.getElementById("oneradius"),
+	"oneradiuslabel": document.getElementById("oneradiuslabel"),
+	"msa": document.getElementById("msa"),
+	"atmosphere": document.getElementById("atmosphere"),
+	"satellite": document.getElementById("satelliteorbit"),
+	"carrier": document.getElementById("carrierorbit"),
+	"launchpoint": document.getElementById("launchpoint"),
+}
+
+function update() {
+	var body = bodies[inputs.bodylist.value];
+	var sataltitude = parseFloat(inputs.altitude.value);
+	if (sataltitude > body.SOI) {
+		outputs.period.setAttribute("disabled","true");
+	}
+	var satcount = parseInt(inputs.satellites.value);
+	var satratio = ((satcount + 1) / satcount);
+	var satelliteorbit = new orbit(sataltitude,sataltitude,body);
+	var carrierorbit = new orbit(sataltitude,sataltitude,body);
+	if (satcount && sataltitude) {
+		carrierorbit.modifyAp = newMAfromT(satelliteorbit.T * satratio,body);
+		if (carrierorbit.Ap > body.SOI || inputs.fliporbit.checked == true) {
+			satratio = ((satcount - 1) / satcount);
+			carrierorbit = new orbit(sataltitude,sataltitude,body);
+			carrierorbit.modifyPe = newMAfromT(satelliteorbit.T * satratio,body);
+		}
+
+		outputs.period.value = satelliteorbit.oph;
+		if (carrierorbit.Ap) outputs.carrierAp.value = (Math.round(carrierorbit.Ap*10)/10).toLocaleString() + " m";
+		if (carrierorbit.Ap < body.atm || carrierorbit.Ap < 0) outputs.carrierAp.classList.add("warning");
+			else outputs.carrierAp.classList.remove("warning");
+		if (carrierorbit.Pe) outputs.carrierPe.value = (Math.round(carrierorbit.Pe*10)/10).toLocaleString() + " m";
+		if (carrierorbit.Pe < body.atm || carrierorbit.Pe < 0) outputs.carrierPe.classList.add("warning");
+			else outputs.carrierPe.classList.remove("warning");
+		outputs.carrierT.value = carrierorbit.oph;
+
+		outputs.burnDV.value = burnCalc(satelliteorbit,carrierorbit,body) + " m/s";
+	}
+	drawchart(satelliteorbit,carrierorbit,body);
+}
+
+function burnCalc(s,c,b) {
+
+	var sta = 0;
+	var cta = 0;
+	if (c.Ap == s.Ap) cta = 180;
+	var sr = s.SMA * ( 1 - Math.pow(s.e,2) ) / ( 1 + ( s.e * Math.cos(sta)));
+	var sdv = Math.sqrt( b.GM * (( 2 / sr ) - ( 1 / s.SMA )));	
+
+	var cr = c.SMA * ( 1 - Math.pow(c.e,2) ) / ( 1 + ( c.e * Math.cos(cta)));
+	var cdv = Math.sqrt( b.GM * (( 2 / sr ) - ( 1 / c.SMA )));	
+
+	return Math.round(100 * Math.abs(sdv - cdv)) / 100;
+}
+
+function drawchart(s,c,b) {
+	var maxMA = Math.max(s.MA,c.MA);
+	if (!maxMA) maxMA = 3 * b.eqr;
+	var coordkm = (1000 / maxMA) / 1.5;
+
+	var view = 1000;
+	var mid = view/2;
+
+	chart.body.setAttribute("r",b.eqr * coordkm);
+	if (b.color != "") {
+		chart.body.setAttribute("fill",b.color);
+	} else {
+		chart.body.setAttribute("fill","#666");
+	}
+	if (b.atm != 0) {
+		chart.atmosphere.setAttribute("r",(b.eqr + b.atm) * coordkm);
+	} else {
+		chart.atmosphere.setAttribute("r",0);
+	}
+	chart.bodySOI.setAttribute("r", b.SOI * coordkm);
+	chart.bodySOIlabel.setAttribute("d",describeArc(mid,mid,(b.SOI * coordkm)+27,60,300));
+	chart.SOId.innerHTML = b.SOI.toLocaleString();
+
+	chart.geosync.setAttribute("r", (b.geo * coordkm));
+	chart.geosynclabel.setAttribute("d",describeArc(mid,mid,(b.geo * coordkm)+27,60,300));
+	chart.syncm.innerHTML = (b.geo - b.eqr).toLocaleString();
+
+	chart.satellite.setAttribute("rx",s.SMA * coordkm);
+	chart.satellite.setAttribute("ry",s.SMA * coordkm);
+	if (s.Ap < b.atm) chart.satellite.classList.add("warning");
+		else chart.satellite.classList.remove("warning");
+
+	var focushift = c.F * coordkm;
+	if (c.MA < s.MA) focushift = focushift * -1;
+	if (c.Pe < b.atm) chart.carrier.classList.add("warning");
+		else chart.carrier.classList.remove("warning");
+	chart.carrier.setAttribute("cx",view/2);
+	chart.carrier.setAttribute("cy",view/2 + focushift);
+	chart.carrier.setAttribute("rx",c.sma * coordkm);
+	chart.carrier.setAttribute("ry",c.SMA * coordkm);
+
+
+	if (inputs.satellites.value == 3 && s.Ap <= 2.5 * b.eqr) {
+		var rad = Math.round(2 * b.eqr * coordkm);
+		chart.oneradius.setAttribute("r",rad);
+		chart.oneradiuslabel.setAttribute("d",describeArc(mid,mid,rad+22,60,300));
+		chart.msa.innerHTML = b.eqr.toLocaleString();
+	} else {
+		chart.oneradius.setAttribute("r",0);
+		chart.oneradiuslabel.setAttribute("d","M 0 0");
+	}
+
+	if (!c.e) {
+		chart.launchpoint.setAttribute("cy",-1000);
+	} else {
+		chart.launchpoint.setAttribute("cy",(view/2) - s.SMA * coordkm);
+	}
+}
+
+function debug(str) {
+	var output = document.getElementById("debug");
+	output.innerHTML += str + "<br>";
+}
+
+
+// Next two functions courtesy http://stackoverflow.com/a/18473154
+
+function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
+	var angleInRadians = (angleInDegrees-90) * Math.PI / 180.0;
+	return {
+		x: centerX + (radius * Math.cos(angleInRadians)),
+		y: centerY + (radius * Math.sin(angleInRadians))
+	};
+}
+
+function describeArc(x, y, radius, startAngle, endAngle){
+	var start = polarToCartesian(x, y, radius, endAngle);
+	var end = polarToCartesian(x, y, radius, startAngle);
+	var largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+	var d = [
+		"M", start.x, start.y, 
+		"A", radius, radius, 0, largeArcFlag, 0, end.x, end.y
+	].join(" ");
+	return d;
+}
+
+setup();
+update();
+
+</script>
+
+</html>

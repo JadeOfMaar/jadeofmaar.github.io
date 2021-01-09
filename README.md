@@ -1,2 +1,2 @@
-# My gitHub pages
-To be announced
+# My GitHub pages
+To be announced.
